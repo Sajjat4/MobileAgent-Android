@@ -1,0 +1,6 @@
+{
+  "name": "MobileAgent",
+  "description": "An autonomous mobile agent app powered by vision-language models for Android task automation",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

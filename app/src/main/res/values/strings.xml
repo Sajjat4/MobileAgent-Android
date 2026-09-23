@@ -98,4 +98,16 @@
     <!-- Notifications -->
     <string name="notif_accessibility_lost_title">Accessibility Service Disconnected</string>
     <string name="notif_accessibility_lost_body">MobileAgent\'s accessibility service was stopped. Tap to re-enable.</string>
+
+    <!-- Gemini & WebSocket -->
+    <string name="settings_provider_gemini">Google Gemini (VLM)</string>
+    <string name="settings_provider_websocket">WebSocket Remote Agent</string>
+    <string name="settings_gemini_configured">Using pre-configured API Key</string>
+    <string name="settings_ws_endpoint">WebSocket URL</string>
+    <string name="settings_ws_endpoint_hint">ws://10.0.2.2:8765/ws</string>
+    <string name="settings_ws_connect">Connect / Test WebSocket</string>
+    <string name="settings_ws_disconnect">Disconnect</string>
+    <string name="settings_ws_streaming">Stream Screen Frames to WebSocket</string>
+    <string name="settings_media_projection_title">MediaProjection Screen Capture</string>
+    <string name="settings_media_projection_desc">High-speed screen frame capture for VLM analysis</string>
 </resources>

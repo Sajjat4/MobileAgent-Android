@@ -154,6 +154,10 @@ class AgentForegroundService : Service() {
             val configError = when (apiConfig.provider) {
                 "local" -> if (!com.mobileagent.app.data.ModelDownloadManager.isReady(this, apiConfig.localModelId))
                     "请先在设置中下载所选模型 / Download the selected model in Settings." else null
+                "gemini" -> if (apiConfig.apiKey.isBlank() && com.mobileagent.app.BuildConfig.GEMINI_API_KEY.isBlank())
+                    "Gemini API key not configured. Go to Settings." else null
+                "websocket" -> if (apiConfig.endpoint.isBlank())
+                    "WebSocket endpoint not configured. Go to Settings." else null
                 else -> if (apiConfig.endpoint.isBlank() || apiConfig.apiKey.isBlank())
                     "API not configured. Go to Settings." else null
             }
@@ -164,6 +168,8 @@ class AgentForegroundService : Service() {
             }
 
             val apiClient: VlmApiClient = when (apiConfig.provider) {
+                "gemini" -> GeminiClient(apiConfig)
+                "websocket" -> WebSocketVlmClient(apiConfig)
                 "anthropic" -> AnthropicClient(apiConfig)
                 "local" -> LocalVlmClient(apiConfig, applicationContext).also { localVlmClient = it }
                 else -> OpenAiCompatibleClient(apiConfig)

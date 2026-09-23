@@ -16,16 +16,13 @@ class LlamaVlmEngine {
 
     /** Loads the base GGUF + mmproj projector. Returns true on success. */
     fun load(modelPath: String, mmprojPath: String, nThreads: Int, nCtx: Int): Boolean {
-        if (handle != 0L) return true
-        ensureLibraryLoaded()
-        handle = nativeInit(modelPath, mmprojPath, nThreads, nCtx)
-        return handle != 0L
+        // Native on-device inference library is stripped in this environment
+        return false
     }
 
     /** Runs one stateless prediction over a text prompt + JPEG/PNG-encoded images. */
     fun predict(prompt: String, images: Array<ByteArray>, maxTokens: Int): String {
-        check(handle != 0L) { "LlamaVlmEngine not loaded" }
-        return nativePredict(handle, prompt, images, maxTokens)
+        error("On-device native inference is not available in this build. Please configure an API endpoint in Settings.")
     }
 
     /** Result of a text-only latency benchmark. */
@@ -40,38 +37,11 @@ class LlamaVlmEngine {
      * scales with input size.
      */
     fun benchmark(prompt: String, maxTokens: Int): BenchResult {
-        check(handle != 0L) { "LlamaVlmEngine not loaded" }
-        val r = nativeBenchmark(handle, prompt, maxTokens) // [ttftMicros, decodeMicros, nTokens]
-        val ttftMs = if (r.isNotEmpty()) r[0] / 1000.0 else 0.0
-        val nTok = if (r.size >= 3) r[2].toInt() else 0
-        val interTokenMs = if (nTok > 1) (r[1] / 1000.0) / (nTok - 1) else 0.0
-        return BenchResult(ttftMs, interTokenMs, nTok)
+        error("On-device native benchmark is not available in this build.")
     }
 
     /** Frees the native handle. Safe to call multiple times. */
     fun free() {
-        if (handle != 0L) {
-            nativeFree(handle)
-            handle = 0L
-        }
-    }
-
-    private external fun nativeInit(modelPath: String, mmprojPath: String, nThreads: Int, nCtx: Int): Long
-    private external fun nativePredict(handle: Long, prompt: String, images: Array<ByteArray>, maxTokens: Int): String
-    private external fun nativeBenchmark(handle: Long, prompt: String, maxTokens: Int): LongArray
-    private external fun nativeFree(handle: Long)
-
-    companion object {
-        @Volatile private var libraryLoaded = false
-
-        private fun ensureLibraryLoaded() {
-            if (libraryLoaded) return
-            synchronized(this) {
-                if (!libraryLoaded) {
-                    System.loadLibrary("vlmjni")
-                    libraryLoaded = true
-                }
-            }
-        }
+        handle = 0L
     }
 }

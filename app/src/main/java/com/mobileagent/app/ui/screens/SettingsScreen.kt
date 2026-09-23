@@ -14,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mobileagent.app.R
 import com.mobileagent.app.api.*
 import com.mobileagent.app.data.ModelDownloadManager
@@ -159,6 +160,8 @@ private fun SettingsContent(
             }
             Spacer(modifier = Modifier.height(8.dp))
             val providers = listOf(
+                "gemini" to stringResource(R.string.settings_provider_gemini),
+                "websocket" to stringResource(R.string.settings_provider_websocket),
                 "openai" to "OpenAI Compatible",
                 "anthropic" to "Anthropic",
                 "local" to stringResource(R.string.settings_provider_local)
@@ -167,7 +170,15 @@ private fun SettingsContent(
                 Row(modifier = Modifier.fillMaxWidth()) {
                     RadioButton(
                         selected = provider == value,
-                        onClick = { provider = value; save() }
+                        onClick = {
+                            provider = value
+                            if (value == "gemini" && model.isBlank()) {
+                                model = "gemini-2.5-flash"
+                            } else if (value == "websocket" && endpoint.isBlank()) {
+                                endpoint = "ws://10.0.2.2:8765/ws"
+                            }
+                            save()
+                        }
                     )
                     Text(
                         text = label,
@@ -185,65 +196,232 @@ private fun SettingsContent(
                     selectedModelId = localModelId,
                     onModelSelect = { id -> localModelId = id; save() }
                 )
-            } else {
-
-            OutlinedTextField(
-                value = endpoint,
-                onValueChange = { endpoint = it; save() },
-                label = { Text(stringResource(R.string.settings_endpoint)) },
-                placeholder = { Text(stringResource(R.string.settings_endpoint_hint)) },
-                leadingIcon = { Icon(Icons.Default.Link, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it; save() },
-                label = { Text(stringResource(R.string.settings_api_key)) },
-                placeholder = { Text(stringResource(R.string.settings_api_key_hint)) },
-                leadingIcon = { Icon(Icons.Default.Key, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation()
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = model,
-                onValueChange = { model = it; save() },
-                label = { Text(stringResource(R.string.settings_model)) },
-                placeholder = { Text(stringResource(R.string.settings_model_hint)) },
-                leadingIcon = { Icon(Icons.Default.SmartToy, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Latency benchmark (short/medium/long) over a streaming response.
-            Button(
-                onClick = {
-                    cloudBenchRunning = true; cloudBenchError = null; cloudBenchResults = null
-                    scope.launch {
-                        try {
-                            cloudBenchResults = runCloudBenchmark(provider, endpoint, apiKey, model)
-                        } catch (e: Exception) {
-                            cloudBenchError = e.message ?: "benchmark failed"
-                        } finally {
-                            cloudBenchRunning = false
+            } else if (provider == "gemini") {
+                // Gemini API configuration
+                val hasBuildConfigKey = com.mobileagent.app.BuildConfig.GEMINI_API_KEY.isNotBlank()
+                if (hasBuildConfigKey && apiKey.isBlank()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.settings_gemini_configured),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         }
                     }
-                },
-                enabled = endpoint.isNotBlank() && apiKey.isNotBlank() && model.isNotBlank() && !cloudBenchRunning,
-                colors = ButtonDefaults.buttonColors(containerColor = BtnTest)
-            ) {
-                Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(stringResource(R.string.settings_model_benchmark))
+                }
+
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { apiKey = it; save() },
+                    label = { Text("Gemini API Key") },
+                    placeholder = {
+                        Text(if (hasBuildConfigKey) "Using preconfigured key" else "AQ...")
+                    },
+                    leadingIcon = { Icon(Icons.Default.Key, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation()
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = if (model.isBlank()) "gemini-2.5-flash" else model,
+                    onValueChange = { model = it; save() },
+                    label = { Text(stringResource(R.string.settings_model)) },
+                    placeholder = { Text("gemini-2.5-flash") },
+                    leadingIcon = { Icon(Icons.Default.SmartToy, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("gemini-2.5-flash", "gemini-flash-latest", "gemini-3.1-pro-preview").forEach { m ->
+                        AssistChip(
+                            onClick = { model = m; save() },
+                            label = { Text(m, fontSize = 11.sp) }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Gemini Benchmark / Connection test button
+                Button(
+                    onClick = {
+                        cloudBenchRunning = true; cloudBenchError = null; cloudBenchResults = null
+                        scope.launch {
+                            try {
+                                cloudBenchResults = runCloudBenchmark("gemini", "", apiKey, if (model.isBlank()) "gemini-2.5-flash" else model)
+                            } catch (e: Exception) {
+                                cloudBenchError = e.message ?: "Gemini test failed"
+                            } finally {
+                                cloudBenchRunning = false
+                            }
+                        }
+                    },
+                    enabled = (apiKey.isNotBlank() || hasBuildConfigKey) && !cloudBenchRunning,
+                    colors = ButtonDefaults.buttonColors(containerColor = BtnTest)
+                ) {
+                    Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(stringResource(R.string.settings_model_benchmark))
+                }
+            } else if (provider == "websocket") {
+                // WebSocket Agent Configuration
+                val wsState by com.mobileagent.app.service.WebSocketAgentBridge.connectionState.collectAsState()
+                val wsMsg by com.mobileagent.app.service.WebSocketAgentBridge.lastMessage.collectAsState()
+
+                OutlinedTextField(
+                    value = if (endpoint.isBlank()) "ws://10.0.2.2:8765/ws" else endpoint,
+                    onValueChange = { endpoint = it; save() },
+                    label = { Text(stringResource(R.string.settings_ws_endpoint)) },
+                    placeholder = { Text(stringResource(R.string.settings_ws_endpoint_hint)) },
+                    leadingIcon = { Icon(Icons.Default.Link, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { apiKey = it; save() },
+                    label = { Text("Auth Token (Optional)") },
+                    placeholder = { Text("Bearer token if required") },
+                    leadingIcon = { Icon(Icons.Default.Key, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation()
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = when (wsState) {
+                            com.mobileagent.app.service.WebSocketAgentBridge.ConnectionState.CONNECTED -> MaterialTheme.colorScheme.primaryContainer
+                            com.mobileagent.app.service.WebSocketAgentBridge.ConnectionState.CONNECTING -> MaterialTheme.colorScheme.secondaryContainer
+                            com.mobileagent.app.service.WebSocketAgentBridge.ConnectionState.ERROR -> MaterialTheme.colorScheme.errorContainer
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        }
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "WebSocket Status: $wsState",
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                        }
+                        if (wsMsg.isNotBlank()) {
+                            Text(
+                                text = wsMsg,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            val url = if (endpoint.isBlank()) "ws://10.0.2.2:8765/ws" else endpoint
+                            com.mobileagent.app.service.WebSocketAgentBridge.connect(url, apiKey)
+                        },
+                        enabled = wsState != com.mobileagent.app.service.WebSocketAgentBridge.ConnectionState.CONNECTED
+                    ) {
+                        Text(stringResource(R.string.settings_ws_connect))
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            com.mobileagent.app.service.WebSocketAgentBridge.disconnect()
+                        },
+                        enabled = wsState == com.mobileagent.app.service.WebSocketAgentBridge.ConnectionState.CONNECTED
+                    ) {
+                        Text(stringResource(R.string.settings_ws_disconnect))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            } else {
+                OutlinedTextField(
+                    value = endpoint,
+                    onValueChange = { endpoint = it; save() },
+                    label = { Text(stringResource(R.string.settings_endpoint)) },
+                    placeholder = { Text(stringResource(R.string.settings_endpoint_hint)) },
+                    leadingIcon = { Icon(Icons.Default.Link, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { apiKey = it; save() },
+                    label = { Text(stringResource(R.string.settings_api_key)) },
+                    placeholder = { Text(stringResource(R.string.settings_api_key_hint)) },
+                    leadingIcon = { Icon(Icons.Default.Key, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation()
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = model,
+                    onValueChange = { model = it; save() },
+                    label = { Text(stringResource(R.string.settings_model)) },
+                    placeholder = { Text(stringResource(R.string.settings_model_hint)) },
+                    leadingIcon = { Icon(Icons.Default.SmartToy, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Latency benchmark (short/medium/long) over a streaming response.
+                Button(
+                    onClick = {
+                        cloudBenchRunning = true; cloudBenchError = null; cloudBenchResults = null
+                        scope.launch {
+                            try {
+                                cloudBenchResults = runCloudBenchmark(provider, endpoint, apiKey, model)
+                            } catch (e: Exception) {
+                                cloudBenchError = e.message ?: "benchmark failed"
+                            } finally {
+                                cloudBenchRunning = false
+                            }
+                        }
+                    },
+                    enabled = endpoint.isNotBlank() && apiKey.isNotBlank() && model.isNotBlank() && !cloudBenchRunning,
+                    colors = ButtonDefaults.buttonColors(containerColor = BtnTest)
+                ) {
+                    Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(stringResource(R.string.settings_model_benchmark))
+                }
             }
             if (cloudBenchRunning) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -265,7 +443,6 @@ private fun SettingsContent(
                 Spacer(modifier = Modifier.height(8.dp))
                 BenchmarkResults(results)
             }
-            } // end provider != "local"
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -715,29 +892,53 @@ private fun streamOnce(
     maxTokens: Int
 ): LlamaVlmEngine.BenchResult {
     val isAnthropic = provider == "anthropic"
-    val ep = endpoint.trimEnd('/')
-    val url = if (isAnthropic) {
-        if (ep.endsWith("/messages")) ep else "$ep/messages"
+    val isGemini = provider == "gemini"
+
+    val effectiveKey = if (apiKey.isNotBlank()) apiKey else com.mobileagent.app.BuildConfig.GEMINI_API_KEY
+    val effectiveModel = if (model.isNotBlank()) model else "gemini-2.5-flash"
+
+    val (url, bodyJson, headers) = if (isGemini) {
+        val geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/$effectiveModel:streamGenerateContent?alt=sse&key=$effectiveKey"
+        val reqBody = buildJsonObject {
+            putJsonArray("contents") {
+                addJsonObject {
+                    put("role", "user")
+                    putJsonArray("parts") {
+                        addJsonObject { put("text", prompt) }
+                    }
+                }
+            }
+            putJsonObject("generationConfig") {
+                put("maxOutputTokens", maxTokens)
+            }
+        }
+        Triple(geminiUrl, reqBody, mapOf("Content-Type" to "application/json"))
     } else {
-        if (ep.endsWith("/chat/completions")) ep else "$ep/chat/completions"
+        val ep = endpoint.trimEnd('/')
+        val finalUrl = if (isAnthropic) {
+            if (ep.endsWith("/messages")) ep else "$ep/messages"
+        } else {
+            if (ep.endsWith("/chat/completions")) ep else "$ep/chat/completions"
+        }
+        val reqBody = buildJsonObject {
+            put("model", model)
+            put("max_tokens", maxTokens)
+            put("stream", true)
+            put("messages", buildJsonArray {
+                addJsonObject { put("role", "user"); put("content", prompt) }
+            })
+        }
+        val hdr = if (isAnthropic) {
+            mapOf("x-api-key" to apiKey, "anthropic-version" to "2023-06-01", "Content-Type" to "application/json")
+        } else {
+            mapOf("Authorization" to "Bearer $apiKey", "Content-Type" to "application/json")
+        }
+        Triple(finalUrl, reqBody, hdr)
     }
-    val bodyJson = buildJsonObject {
-        put("model", model)
-        put("max_tokens", maxTokens)
-        put("stream", true)
-        put("messages", buildJsonArray {
-            addJsonObject { put("role", "user"); put("content", prompt) }
-        })
-    }
+
     val builder = Request.Builder().url(url)
         .post(bodyJson.toString().toRequestBody("application/json".toMediaType()))
-    if (isAnthropic) {
-        builder.addHeader("x-api-key", apiKey)
-        builder.addHeader("anthropic-version", "2023-06-01")
-    } else {
-        builder.addHeader("Authorization", "Bearer $apiKey")
-    }
-    builder.addHeader("Content-Type", "application/json")
+    headers.forEach { (k, v) -> builder.addHeader(k, v) }
 
     val json = Json { ignoreUnknownKeys = true }
     val client = OkHttpClient.Builder()
@@ -763,7 +964,7 @@ private fun streamOnce(
             val data = line.substring(5).trim()
             if (data.isEmpty()) continue
             if (data == "[DONE]") break
-            val text = extractDeltaText(json, data, isAnthropic)
+            val text = extractDeltaText(json, data, isAnthropic, isGemini)
             if (text.isNullOrEmpty()) continue                // skip role/ping/empty deltas
             val now = System.nanoTime()
             if (chunks == 0) ttftNs = now - start else interNs += now - lastNs
@@ -776,10 +977,15 @@ private fun streamOnce(
     return LlamaVlmEngine.BenchResult(ttftMs, interMs, chunks)
 }
 
-/** Pulls the incremental text from one SSE data line (OpenAI delta.content / Anthropic delta.text). */
-private fun extractDeltaText(json: Json, data: String, isAnthropic: Boolean): String? = try {
+/** Pulls the incremental text from one SSE data line. */
+private fun extractDeltaText(json: Json, data: String, isAnthropic: Boolean, isGemini: Boolean = false): String? = try {
     val obj = json.parseToJsonElement(data).jsonObject
-    if (isAnthropic) {
+    if (isGemini) {
+        obj["candidates"]?.jsonArray?.firstOrNull()?.jsonObject
+            ?.get("content")?.jsonObject
+            ?.get("parts")?.jsonArray?.firstOrNull()?.jsonObject
+            ?.get("text")?.jsonPrimitive?.contentOrNull
+    } else if (isAnthropic) {
         obj["delta"]?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull
     } else {
         obj["choices"]?.jsonArray?.firstOrNull()?.jsonObject
@@ -805,7 +1011,25 @@ private suspend fun testApiConnection(
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
 
-        val (url, body, headers) = if (provider == "anthropic") {
+        val (url, body, headers) = if (provider == "gemini") {
+            val effectiveKey = if (apiKey.isNotBlank()) apiKey else com.mobileagent.app.BuildConfig.GEMINI_API_KEY
+            val effectiveModel = if (model.isNotBlank()) model else "gemini-2.5-flash"
+            val geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/$effectiveModel:generateContent?key=$effectiveKey"
+            val reqBody = buildJsonObject {
+                putJsonArray("contents") {
+                    addJsonObject {
+                        put("role", "user")
+                        putJsonArray("parts") {
+                            addJsonObject { put("text", "Say hello in one word.") }
+                        }
+                    }
+                }
+                putJsonObject("generationConfig") {
+                    put("maxOutputTokens", 16)
+                }
+            }
+            Triple(geminiUrl, reqBody.toString(), mapOf("Content-Type" to "application/json"))
+        } else if (provider == "anthropic") {
             val reqBody = buildJsonObject {
                 put("model", model)
                 put("max_tokens", 64)
@@ -890,7 +1114,12 @@ private suspend fun testApiConnection(
             ))
         }
 
-        val reply = if (provider == "anthropic") {
+        val reply = if (provider == "gemini") {
+            jsonObj["candidates"]?.jsonArray?.firstOrNull()
+                ?.jsonObject?.get("content")?.jsonObject
+                ?.get("parts")?.jsonArray?.firstOrNull()
+                ?.jsonObject?.get("text")?.jsonPrimitive?.content ?: "OK"
+        } else if (provider == "anthropic") {
             jsonObj["content"]?.jsonArray?.firstOrNull()
                 ?.jsonObject?.get("text")?.jsonPrimitive?.content ?: "OK"
         } else {

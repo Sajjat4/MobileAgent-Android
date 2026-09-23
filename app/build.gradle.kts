@@ -6,20 +6,22 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
-val keystorePropertiesFile = rootProject.file("keystore.properties")
-val keystoreProperties = Properties().apply {
-    if (keystorePropertiesFile.exists()) {
-        keystorePropertiesFile.inputStream().use { load(it) }
+val envFile = rootProject.file(".env")
+val envProps = Properties().apply {
+    if (envFile.exists()) {
+        envFile.inputStream().use { load(it) }
     }
+}
+fun getEnvSecret(key: String, fallback: String = ""): String {
+    return System.getenv(key)
+        ?: envProps.getProperty(key)
+        ?: (project.findProperty(key) as? String)
+        ?: fallback
 }
 
 android {
     namespace = "com.mobileagent.app"
     compileSdk = 34
-
-    // NDK used to build the on-device llama.cpp + libmtmd engine. Set to the version
-    // installed in your SDK (r28+ also gives 16 KB page alignment automatically).
-    ndkVersion = "30.0.14904198"
 
     defaultConfig {
         applicationId = "com.mobileagent.app"
@@ -28,54 +30,25 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        ndk {
-            // On-device inference ships arm64 only (the only ABI worth the size).
-            abiFilters += "arm64-v8a"
-        }
-        externalNativeBuild {
-            cmake {
-                // Release, arm64, with the multimodal CLI suppressed; only our
-                // vlmjni.so (+ the llama/ggml/mtmd .so it links) ends up in the APK.
-                arguments += listOf("-DANDROID_STL=c++_shared")
-            }
-        }
-    }
-
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
-        }
-    }
-
-    packaging {
-        jniLibs {
-            // These tool implementation libraries are built as a side effect of
-            // LLAMA_BUILD_TOOLS=ON for libmtmd, but the app never loads them.
-            excludes += listOf(
-                "lib/arm64-v8a/libllama-batched-bench-impl.so",
-                "lib/arm64-v8a/libllama-bench-impl.so",
-                "lib/arm64-v8a/libllama-completion-impl.so",
-                "lib/arm64-v8a/libllama-fit-params-impl.so",
-                "lib/arm64-v8a/libllama-perplexity-impl.so",
-                "lib/arm64-v8a/libllama-quantize-impl.so"
-            )
-        }
+        val geminiKey = getEnvSecret("GEMINI_API_KEY", "")
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
     }
 
     signingConfigs {
-        create("release") {
-            storeFile = rootProject.file(keystoreProperties.getProperty("storeFile", ""))
-            storePassword = keystoreProperties.getProperty("storePassword", "")
-            keyAlias = keystoreProperties.getProperty("keyAlias", "")
-            keyPassword = keystoreProperties.getProperty("keyPassword", "")
+        create("debugConfig") {
+            storeFile = file("${rootDir}/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debugConfig")
+        }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -94,6 +67,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -134,4 +108,7 @@ dependencies {
     // Core
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
+
+    // Testing
+    testImplementation("junit:junit:4.13.2")
 }

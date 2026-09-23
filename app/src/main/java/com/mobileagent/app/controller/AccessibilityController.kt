@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Point
 import android.view.WindowManager
 import com.mobileagent.app.service.AgentAccessibilityService
+import com.mobileagent.app.service.ScreenContentInfo
 import kotlinx.coroutines.delay
 
 class AccessibilityController(
@@ -25,6 +26,11 @@ class AccessibilityController(
         delay(100)
     }
 
+    override suspend fun doubleTap(x: Int, y: Int) {
+        service.performDoubleTap(x.toFloat(), y.toFloat())
+        delay(100)
+    }
+
     override suspend fun longPress(x: Int, y: Int, durationMs: Long) {
         service.performLongPress(x.toFloat(), y.toFloat(), durationMs)
         delay(100)
@@ -37,6 +43,11 @@ class AccessibilityController(
             durationMs
         )
         delay(100)
+    }
+
+    override suspend fun scroll(direction: String) {
+        service.performScroll(direction)
+        delay(300)
     }
 
     override suspend fun typeText(text: String) {
@@ -54,9 +65,18 @@ class AccessibilityController(
         delay(500)
     }
 
+    override suspend fun pressRecents() {
+        service.performRecents()
+        delay(300)
+    }
+
     override suspend fun pressEnter() {
         service.performEnter()
         delay(100)
+    }
+
+    override suspend fun readScreenContent(): ScreenContentInfo {
+        return service.readScreenContent()
     }
 
     override fun getScreenSize(): Pair<Int, Int> {

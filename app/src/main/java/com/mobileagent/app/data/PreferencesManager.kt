@@ -40,11 +40,31 @@ class PreferencesManager(private val context: Context) {
     )
 
     val settingsFlow: Flow<Settings> = context.dataStore.data.map { prefs ->
+        val provider = prefs[KEY_PROVIDER] ?: "gemini"
+        val savedKey = prefs[KEY_API_KEY] ?: ""
+        val effectiveApiKey = if (savedKey.isBlank() && provider == "gemini") {
+            com.mobileagent.app.BuildConfig.GEMINI_API_KEY
+        } else {
+            savedKey
+        }
+        val savedModel = prefs[KEY_MODEL] ?: ""
+        val effectiveModel = if (savedModel.isBlank() && provider == "gemini") {
+            "gemini-2.5-flash"
+        } else {
+            savedModel
+        }
+        val savedEndpoint = prefs[KEY_ENDPOINT] ?: ""
+        val effectiveEndpoint = if (savedEndpoint.isBlank() && provider == "websocket") {
+            "ws://10.0.2.2:8765/ws"
+        } else {
+            savedEndpoint
+        }
+
         Settings(
-            provider = prefs[KEY_PROVIDER] ?: "openai",
-            endpoint = prefs[KEY_ENDPOINT] ?: "",
-            apiKey = prefs[KEY_API_KEY] ?: "",
-            model = prefs[KEY_MODEL] ?: "",
+            provider = provider,
+            endpoint = effectiveEndpoint,
+            apiKey = effectiveApiKey,
+            model = effectiveModel,
             coordType = prefs[KEY_COORD_TYPE] ?: "absolute",
             maxSteps = prefs[KEY_MAX_STEPS] ?: 25,
             enableNotetaker = prefs[KEY_ENABLE_NOTETAKER] ?: true,
